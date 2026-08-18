@@ -1,7 +1,6 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { neon } from '@neondatabase/serverless';
 
-export default async function handler(_req: VercelRequest, res: VercelResponse) {
+export default async function handler(_req:any, res:any) {
   try {
     if (!process.env.DATABASE_URL) return res.status(503).json({ ok:false, error:'DATABASE_URL is not configured' });
     const sql = neon(process.env.DATABASE_URL);
