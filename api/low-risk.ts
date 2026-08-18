@@ -10,15 +10,24 @@ export default async function handler(req:any,res:any){
     const round=crypto.randomUUID();
     const won=crypto.getRandomValues(new Uint32Array(1))[0]%100<50;
     const profit=won?Math.round(stake*.9):-Math.round(stake*.1);
-    const payout=won?stake+profit:stake+profit;
-    const rows=await sql.transaction([
-      sql`insert into game_rounds(id,game_type,status,seed_reveal) values(${round},'LOW_RISK','SETTLED','demo-server-rng') returning id`,
-      sql`insert into game_entries(round_id,user_id,stake,choice,result,payout) values(${round},${userId},${stake},'SPIN',${won?'WIN':'LOSS'},${payout})`,
-      sql`update wallets set balance=balance+${profit},updated_at=now() where user_id=${userId} and balance+${profit}>=0 returning balance`,
-      sql`insert into ledger_entries(user_id,amount,entry_type,reference_id,metadata) values(${userId},${profit},'PAYOUT',${round},jsonb_build_object('game','LOW_RISK','stake',${stake},'result',${won?'WIN':'LOSS'}))`
-    ]);
-    const wallet=rows[2][0];
-    if(!wallet) return res.status(409).json({error:'Insufficient balance'});
-    return res.status(200).json({roundId:round,result:won?'WIN':'LOSS',profit,balance:Number(wallet.balance)});
+    const payout=stake+profit;
+    const rows=await sql`
+      with debited as (
+        update wallets set balance=balance+${profit},updated_at=now()
+        where user_id=${userId} and balance+${profit}>=0
+        returning user_id,balance
+      ), new_round as (
+        insert into game_rounds(id,game_type,status,seed_reveal)
+        select ${round},'LOW_RISK','SETTLED','demo-server-rng' from debited returning id
+      ), new_entry as (
+        insert into game_entries(round_id,user_id,stake,choice,result,payout)
+        select ${round},${userId},${stake},'SPIN',${won?'WIN':'LOSS'},${payout} from debited returning round_id
+      )
+      insert into ledger_entries(user_id,amount,entry_type,reference_id,metadata)
+      select ${userId},${profit},'PAYOUT',${round},jsonb_build_object('game','LOW_RISK','stake',${stake},'result',${won?'WIN':'LOSS'}) from debited
+      returning amount`;
+    if(!rows.length) return res.status(409).json({error:'Insufficient balance'});
+    const wallet=await sql`select balance from wallets where user_id=${userId}`;
+    return res.status(200).json({roundId:round,result:won?'WIN':'LOSS',profit,balance:Number(wallet[0].balance)});
   }catch(e){return res.status(500).json({error:'Round settlement failed'});}
 }
