@@ -2,13 +2,13 @@
 create extension if not exists pgcrypto;
 
 create table if not exists profiles (
-  id uuid primary key default gen_random_uuid(),
+  id text primary key,
   username text unique not null,
   created_at timestamptz not null default now()
 );
 
 create table if not exists wallets (
-  user_id uuid primary key references profiles(id) on delete cascade,
+  user_id text primary key,
   currency text not null default 'SPIN',
   balance bigint not null default 10000 check (balance >= 0),
   created_at timestamptz not null default now(),
@@ -17,10 +17,11 @@ create table if not exists wallets (
 
 create table if not exists ledger_entries (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references profiles(id),
+  user_id text not null,
   amount bigint not null,
   entry_type text not null check (entry_type in ('WELCOME','STAKE','PAYOUT','REFUND','ADJUSTMENT')),
-  reference_id uuid,
+  reference_id text,
+  idempotency_key text unique,
   metadata jsonb not null default '{}',
   created_at timestamptz not null default now()
 );
@@ -38,7 +39,7 @@ create table if not exists game_rounds (
 create table if not exists game_entries (
   id uuid primary key default gen_random_uuid(),
   round_id uuid not null references game_rounds(id),
-  user_id uuid not null references profiles(id),
+  user_id text not null,
   stake bigint not null check (stake > 0),
   choice text,
   result text,
