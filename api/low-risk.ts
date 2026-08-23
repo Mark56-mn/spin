@@ -1,4 +1,5 @@
 import { neon } from '@neondatabase/serverless'
+import { getAuthenticatedUser } from './_shared'
 type VercelRequest = { method?: string; body?: unknown; headers: Record<string, string | string[] | undefined> }
 type VercelResponse = { status: (code: number) => VercelResponse; json: (body: unknown) => VercelResponse }
 
@@ -10,18 +11,11 @@ const PAYOUT_BPS: Record<Risk, { win: number; loss: number }> = {
 }
 const MAX_DEMO_STAKE = Number(process.env.MAX_DEMO_STAKE || 5000)
 
-function getSessionUserId(req: VercelRequest): string | null {
-  // The identity must be injected by the authenticated edge/session layer.
-  // Never accept userId from a JSON body or query string.
-  const value = req.headers['x-neon-auth-user']
-  return typeof value === 'string' && /^[a-zA-Z0-9_-]{8,128}$/.test(value) ? value : null
-}
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST required' })
   if (process.env.REAL_MONEY_ENABLED === 'true') return res.status(503).json({ error: 'Demo mode is required' })
 
-  const userId = getSessionUserId(req)
+  const userId = await getAuthenticatedUser(req)
   if (!userId) return res.status(401).json({ error: 'Authentication required' })
 
   const body = req.body as { risk?: unknown; stake?: unknown; idempotencyKey?: unknown } | undefined

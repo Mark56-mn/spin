@@ -1,9 +1,9 @@
-import { authUserId, bodyOf, code, db, demoOnly, fail, int, key, type Request, type Response } from './_shared'
+import { getAuthenticatedUser, bodyOf, code, db, demoOnly, fail, int, key, type Request, type Response } from './_shared'
 
 const MAX_STAKE = 5000
 export default async function handler(req: Request, res: Response) {
   const blocked = demoOnly(res); if (blocked) return blocked
-  const userId = authUserId(req); if (!userId) return fail(res, 401, 'Authentication required')
+  const userId = await getAuthenticatedUser(req); if (!userId) return fail(res, 401, 'Authentication required')
   let sql; try { sql = db() } catch { return fail(res, 503, 'Database unavailable') }
   const input = bodyOf(req)
   if (req.method === 'GET') {

@@ -1,11 +1,29 @@
 import { neon } from '@neondatabase/serverless'
 
 export type Request = { method?: string; body?: unknown; headers: Record<string, string | string[] | undefined> }
-export type Response = { status: (code: number) => Response; json: (body: unknown) => Response }
+export type Response = { status: (code: number) => Response; json: (body: unknown) => Response; setHeader?: (name: string, value: string | string[]) => void }
 
-export function authUserId(req: Request) {
-  const value = req.headers['x-neon-auth-user']
-  return typeof value === 'string' && /^[a-zA-Z0-9_-]{8,128}$/.test(value) ? value : null
+export async function getAuthenticatedUser(req: Request): Promise<string | null> {
+  // Never trust x-neon-auth-user: it is browser-spoofable and is intentionally ignored.
+  const cookie = req.headers.cookie
+  const authorization = req.headers.authorization
+  const baseUrl = process.env.NEON_AUTH_BASE_URL
+  if (!baseUrl || (typeof cookie !== 'string' && typeof authorization !== 'string')) return null
+  try {
+    const response = await fetch(`${baseUrl.replace(/\\/$/, '')}/get-session`, {
+      headers: {
+        ...(typeof cookie === 'string' ? { cookie } : {}),
+        ...(typeof authorization === 'string' ? { authorization } : {}),
+      },
+      cache: 'no-store',
+    })
+    if (!response.ok) return null
+    const payload = await response.json() as { user?: { id?: unknown } }
+    const id = payload.user?.id
+    return typeof id === 'string' && /^[a-zA-Z0-9_-]{8,128}$/.test(id) ? id : null
+  } catch {
+    return null
+  }
 }
 export function bodyOf(req: Request) { return (req.body && typeof req.body === 'object' ? req.body : {}) as Record<string, unknown> }
 export function int(value: unknown) { return typeof value === 'number' && Number.isInteger(value) ? value : null }

@@ -12,6 +12,9 @@ test('client has no browser authority persistence or random market engine', asyn
 test('settlement handlers fail closed without authenticated identity', async () => {
   const [lowRisk, market, duel] = await Promise.all(['api/low-risk.ts', 'api/market.ts', 'api/duel.ts'].map(file => readFile(new URL(`../${file}`, import.meta.url), 'utf8')))
   for (const source of [lowRisk, market, duel]) assert.match(source, /Authentication required/)
+  const shared = await readFile(new URL('../api/_shared.ts', import.meta.url), 'utf8')
+  assert.match(shared, /getAuthenticatedUser/)
+  assert.equal(shared.includes("req.headers['x-neon-auth-user']"), false)
   assert.match(lowRisk, /idempotencyKey/)
   assert.match(market, /action === 'resolve'/)
   assert.match(duel, /action === 'join'/)

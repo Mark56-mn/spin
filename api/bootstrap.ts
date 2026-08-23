@@ -1,16 +1,12 @@
 import { neon } from '@neondatabase/serverless'
+import { getAuthenticatedUser } from './_shared'
 
 type Request = { method?: string; body?: unknown; headers: Record<string, string | string[] | undefined> }
 type Response = { status: (code: number) => Response; json: (body: unknown) => Response }
 
-function getSessionUserId(req: Request): string | null {
-  const value = req.headers['x-neon-auth-user']
-  return typeof value === 'string' && /^[a-zA-Z0-9_-]{8,128}$/.test(value) ? value : null
-}
-
 export default async function handler(req: Request, res: Response) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST required' })
-  const userId = getSessionUserId(req)
+  const userId = await getAuthenticatedUser(req)
   if (!userId) return res.status(401).json({ error: 'Authentication required' })
   const body = req.body as { username?: unknown } | undefined
   const username = typeof body?.username === 'string' ? body.username.trim().slice(0, 24) : ''
