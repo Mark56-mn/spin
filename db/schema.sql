@@ -82,6 +82,8 @@ create index if not exists duels_code_idx on duels(code);
 create index if not exists duels_expires_idx on duels(expires_at) where status = 'WAITING';
 
 create index if not exists ledger_user_created_idx on ledger_entries(user_id, created_at desc);
+create unique index if not exists ledger_payout_reference_idx on ledger_entries(reference_id, entry_type, user_id) where entry_type = 'PAYOUT';
+create unique index if not exists ledger_refund_reference_idx on ledger_entries(reference_id, entry_type, user_id) where entry_type = 'REFUND';
 create index if not exists entries_round_idx on game_entries(round_id);
 create unique index if not exists game_entries_round_user_idx on game_entries(round_id, user_id);
 create index if not exists ticks_round_idx on market_ticks(round_id, tick_no);
