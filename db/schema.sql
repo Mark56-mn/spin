@@ -33,7 +33,12 @@ create table if not exists game_rounds (
   seed_hash text,
   seed_reveal text,
   created_at timestamptz not null default now(),
-  settled_at timestamptz
+  settled_at timestamptz,
+  opening_price numeric(18,8),
+  closing_price numeric(18,8),
+  outcome text,
+  duration_seconds integer,
+  idempotency_key text unique
 );
 
 create table if not exists game_entries (
@@ -54,6 +59,27 @@ create table if not exists market_ticks (
   tick_no integer not null,
   created_at timestamptz not null default now()
 );
+
+create table if not exists duels (
+  id uuid primary key default gen_random_uuid(),
+  code text unique not null,
+  round_id uuid unique not null references game_rounds(id),
+  creator_id text not null,
+  opponent_id text,
+  stake bigint not null check (stake > 0),
+  status text not null default 'WAITING' check (status in ('WAITING','ACTIVE','SETTLED','CANCELLED','EXPIRED')),
+  creator_choice text,
+  opponent_choice text,
+  winner_id text,
+  expires_at timestamptz not null default now() + interval '15 minutes',
+  created_at timestamptz not null default now(),
+  settled_at timestamptz,
+  idempotency_key text unique
+);
+
+create unique index if not exists duel_active_creator_idx on duels(creator_id) where status in ('WAITING','ACTIVE');
+create index if not exists duels_code_idx on duels(code);
+create index if not exists duels_expires_idx on duels(expires_at) where status = 'WAITING';
 
 create index if not exists ledger_user_created_idx on ledger_entries(user_id, created_at desc);
 create index if not exists entries_round_idx on game_entries(round_id);
