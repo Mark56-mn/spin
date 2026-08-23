@@ -83,4 +83,6 @@ create index if not exists duels_expires_idx on duels(expires_at) where status =
 
 create index if not exists ledger_user_created_idx on ledger_entries(user_id, created_at desc);
 create index if not exists entries_round_idx on game_entries(round_id);
+create unique index if not exists game_entries_round_user_idx on game_entries(round_id, user_id);
 create index if not exists ticks_round_idx on market_ticks(round_id, tick_no);
+create unique index if not exists duel_opponent_unique_idx on duels(opponent_id) where opponent_id is not null and status in ('ACTIVE','SETTLED');

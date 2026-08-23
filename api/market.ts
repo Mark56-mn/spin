@@ -1,4 +1,4 @@
-import { getAuthenticatedUser, bodyOf, db, demoOnly, fail, int, key, serverSeed, type Request, type Response } from './_shared'
+import { getAuthenticatedUser, bodyOf, db, demoOnly, fail, int, key, serverSeed, transaction, type Request, type Response } from './_shared'
 
 const MAX_STAKE = 5000
 const duration = 15
@@ -19,8 +19,9 @@ export default async function handler(req: Request, res: Response) {
     const existing = await sql`select id, status, opening_price as "openingPrice", created_at as "createdAt" from game_rounds where idempotency_key = ${idempotencyKey} limit 1`
     if (existing.length) return res.status(200).json({ ...existing[0], replayed: true })
     const roundId = crypto.randomUUID(); const seed = serverSeed(); const opening = 100
-    const rows = await sql`insert into game_rounds(id, game_type, status, seed_hash, opening_price, duration_seconds, idempotency_key) values(${roundId}, 'MARKET', 'OPEN', encode(digest(${seed}, 'sha256'), 'hex'), ${opening}, ${duration}, ${idempotencyKey}) returning id, status, opening_price as "openingPrice", created_at as "createdAt"`
-    await sql`insert into market_ticks(round_id, price, tick_no) values(${roundId}, ${opening}, 0)`
+    const insertRound = sql`insert into game_rounds(id, game_type, status, seed_hash, opening_price, duration_seconds, idempotency_key) values(${roundId}, 'MARKET', 'OPEN', encode(digest(${seed}, 'sha256'), 'hex'), ${opening}, ${duration}, ${idempotencyKey}) returning id, status, opening_price as "openingPrice", created_at as "createdAt"`
+    const insertTick = sql`insert into market_ticks(round_id, price, tick_no) values(${roundId}, ${opening}, 0)`
+    const [rows] = await transaction<any>(sql, [insertRound, insertTick])
     return res.status(201).json({ ...rows[0], replayed: false })
   }
   if (action === 'participate') {
